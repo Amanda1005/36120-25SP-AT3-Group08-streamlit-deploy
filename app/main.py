@@ -1,20 +1,37 @@
 import streamlit as st
-import sys, os
+import sys
+import os
 import requests
 
-# Allow Streamlit to find the students folder
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# === PATH SETUP ===
+# Get the absolute path of current file
+current_file = os.path.abspath(__file__)
+current_dir = os.path.dirname(current_file)
+parent_dir = os.path.dirname(current_dir)
 
-# Import crypto pages
-from students.bitcoin import show_bitcoin_page
-from students.ethereum import show_ethereum_page
-from students.xrp import show_xrp_page
-from students.solana import show_solana_page
+# Add parent directory to Python path
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 
-# Streamlit setup
+# === IMPORT CRYPTO PAGES ===
+try:
+    from students.bitcoin import show_bitcoin_page
+    from students.ethereum import show_ethereum_page
+    from students.xrp import show_xrp_page
+    from students.solana import show_solana_page
+except ImportError as e:
+    st.error(f"❌ Failed to import student modules: {e}")
+    st.info(f"Current directory: {current_dir}")
+    st.info(f"Parent directory: {parent_dir}")
+    st.info(f"Looking for: {os.path.join(parent_dir, 'students')}")
+    if os.path.exists(os.path.join(parent_dir, 'students')):
+        st.info(f"Files in students/: {os.listdir(os.path.join(parent_dir, 'students'))}")
+    st.stop()
+
+# === STREAMLIT SETUP ===
 st.set_page_config(page_title="Crypto Next-Day High Dashboard", layout="wide")
 
-# CSS Styling
+# === CSS STYLING ===
 st.markdown("""
 <style>
 header[data-testid="stHeader"] { background: transparent; }
@@ -69,16 +86,27 @@ div[data-testid="stButton"] button:active {
 </style>
 """, unsafe_allow_html=True)
 
-# Live prices ticker
+# === LIVE PRICES TICKER ===
 @st.cache_data(ttl=60)
 def get_crypto_prices():
+    """Fetch live cryptocurrency prices from CoinGecko API"""
     url = "https://api.coingecko.com/api/v3/simple/price"
-    params = {"ids": "bitcoin,ethereum,ripple,solana", "vs_currencies": "usd", "include_24hr_change": "true"}
+    params = {
+        "ids": "bitcoin,ethereum,ripple,solana", 
+        "vs_currencies": "usd", 
+        "include_24hr_change": "true"
+    }
     try:
-        data = requests.get(url, params=params, timeout=5).json()
+        response = requests.get(url, params=params, timeout=5)
+        data = response.json()
         parts = []
         for coin, info in data.items():
-            symbol = {"bitcoin": "BTC", "ethereum": "ETH", "ripple": "XRP", "solana": "SOL"}[coin]
+            symbol = {
+                "bitcoin": "BTC", 
+                "ethereum": "ETH", 
+                "ripple": "XRP", 
+                "solana": "SOL"
+            }[coin]
             price = info.get("usd", 0)
             change = info.get("usd_24h_change", 0)
             arrow = "▲" if change >= 0 else "▼"
@@ -89,24 +117,27 @@ def get_crypto_prices():
                 f"<span style='color:{color};font-weight:600'>{arrow}{abs(change):.2f}%</span>"
             )
         return "  ".join(parts)
-    except Exception:
+    except Exception as e:
+        # Fallback data if API fails
         return "BTC/USD 67,450 ▲1.25% ETH/USD 3,120 ▲0.84% XRP/USD 0.512 ▼0.34% SOL/USD 102.4 ▲2.02%"
 
-# Show ticker
+# Display ticker
 prices_html = get_crypto_prices()
 st.markdown(f"<div class='ticker'><span>{prices_html}</span></div>", unsafe_allow_html=True)
 
-# Title
+# === TITLE ===
 st.title("Crypto Next-Day High Price Prediction Dashboard")
 
-# Button Navigation 
+# === NAVIGATION BUTTONS ===
 st.markdown("### Select Cryptocurrency")
 
 col1, col2, col3, col4 = st.columns(4)
 
+# Initialize session state
 if "selected_coin" not in st.session_state:
     st.session_state.selected_coin = None
 
+# Create buttons
 with col1:
     if st.button("Bitcoin", use_container_width=True):
         st.session_state.selected_coin = "Bitcoin"
@@ -122,6 +153,7 @@ with col4:
 
 st.markdown("---")
 
+# === DISPLAY SELECTED PAGE ===
 try:
     if st.session_state.selected_coin == "Bitcoin":
         show_bitcoin_page()
@@ -132,11 +164,17 @@ try:
     elif st.session_state.selected_coin == "Solana":
         show_solana_page()
     else:
-        st.markdown("<p style='text-align:center;color:#777;'>Please select a cryptocurrency above to view predictions and charts.</p>", unsafe_allow_html=True)
+        st.markdown(
+            "<p style='text-align:center;color:#777;'>"
+            "Please select a cryptocurrency above to view predictions and charts."
+            "</p>", 
+            unsafe_allow_html=True
+        )
 except Exception as e:
-    st.error(f"Error loading {st.session_state.selected_coin} page: {e}")
+    st.error(f"❌ Error loading {st.session_state.selected_coin} page: {e}")
+    st.exception(e)
 
-# Footer
+# === FOOTER ===
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #8B7355; padding: 1rem; font-size: 13px;'>
