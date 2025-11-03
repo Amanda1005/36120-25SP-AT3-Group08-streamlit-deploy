@@ -1,1 +1,1 @@
-python-3.10  # set python version for Streamlit Cloud
+python-3.11
